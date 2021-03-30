@@ -1,5 +1,6 @@
 import sys
 sys.path.append('./fine-tuning')
+sys.path.append('./gender')
 
 from modeling_single_layer import BertConfig, BertForSequenceClassification
 import torch
@@ -8,6 +9,12 @@ from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm, trange
 import numpy as np
 import random
+from MutantGeneration import MutantGeneration
+
+seed = 42
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
 
 class InputFeatures(object):
     """A single set of features of data."""
@@ -43,54 +50,58 @@ class SentimentAnalysis():
         ### Initialize tokenizer
         self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file, do_lower_case=True)
 
-    def convert_text_to_feature(self, text, max_seq_length=256):
+    def convert_text_to_feature(self, texts, max_seq_length=256):
         '''
         Convert text to features that BERT can take in
         '''
-        # 1: convert to unicode
-        text = tokenization.convert_to_unicode(text)
+        features = []
+        for text in texts:
+            # 1: convert to unicode
+            text = tokenization.convert_to_unicode(text)
 
-        # 2: convert to features
-        # eval_features = convert_examples_to_features(eval_examples, label_list, args.max_seq_length, tokenizer, trunc_medium=args.trunc_medium)
-        tokens_a = self.tokenizer.tokenize(text)
+            # 2: convert to features
+            # eval_features = convert_examples_to_features(eval_examples, label_list, args.max_seq_length, tokenizer, trunc_medium=args.trunc_medium)
+            tokens_a = self.tokenizer.tokenize(text)
 
-        tokens = []
-        segment_ids = []
-        tokens.append("[CLS]")
-        segment_ids.append(0)
-        for token in tokens_a:
-            tokens.append(token)
+            tokens = []
+            segment_ids = []
+            tokens.append("[CLS]")
             segment_ids.append(0)
-        tokens.append("[SEP]")
-        segment_ids.append(0)
-
-        input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
-        input_mask = [1] * len(input_ids)
-
-        # Zero-pad up to the sequence length.
-        while len(input_ids) < max_seq_length:
-            input_ids.append(0)
-            input_mask.append(0)
+            for token in tokens_a:
+                tokens.append(token)
+                segment_ids.append(0)
+            tokens.append("[SEP]")
             segment_ids.append(0)
 
-        assert len(input_ids) == max_seq_length
-        assert len(input_mask) == max_seq_length
-        assert len(segment_ids) == max_seq_length
+            input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
+            input_mask = [1] * len(input_ids)
 
-        label_id = -1
-        ## since we don't know the ground truth of a text
-        ## 但貌似并不能设置为-1
-        feature = InputFeatures(
-                        input_ids=input_ids,
-                        input_mask=input_mask,
-                        segment_ids=segment_ids,
-                        label_id=label_id)
+            # Zero-pad up to the sequence length.
+            while len(input_ids) < max_seq_length:
+                input_ids.append(0)
+                input_mask.append(0)
+                segment_ids.append(0)
 
-        tensor_data = TensorDataset(torch.tensor([input_ids], dtype=torch.long), 
-                                torch.tensor([input_mask], dtype=torch.long), 
-                                torch.tensor([segment_ids], dtype=torch.long), 
-                                torch.tensor([label_id], dtype=torch.long))
-        
+            assert len(input_ids) == max_seq_length
+            assert len(input_mask) == max_seq_length
+            assert len(segment_ids) == max_seq_length
+
+            label_id = -1
+            ## since we don't know the ground truth of a text
+            feature = InputFeatures(
+                            input_ids=input_ids,
+                            input_mask=input_mask,
+                            segment_ids=segment_ids,
+                            label_id=label_id)
+            features.append(feature)
+
+        all_input_ids = torch.tensor([f.input_ids for f in features], dtype=torch.long)
+        all_input_mask = torch.tensor([f.input_mask for f in features], dtype=torch.long)
+        all_segment_ids = torch.tensor([f.segment_ids for f in features], dtype=torch.long)
+        all_label_ids = torch.tensor([f.label_id for f in features], dtype=torch.long)
+
+
+        tensor_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
         data_loader = DataLoader(tensor_data, batch_size=1, shuffle=False)
 
         return data_loader
@@ -103,14 +114,23 @@ class SentimentAnalysis():
             text:         a piece of text
             use_verifier: specify to use verifier'''
         
+        if use_verifier:
+            '''generate mutants use biasfinder'''
+            mg = MutantGeneration(text)
+            if len(mg.getMutants()) > 0:
+                mutant = mg.getMutants()
+
+
+
         # covert text: str to features that bert can take in
-        data_loader = self.convert_text_to_feature(text)
+        data_loader = self.convert_text_to_feature([text] + mutant)
 
         self._model.eval()
 
         device = self.device
+        results = []
 
-        for input_ids, input_mask, segment_ids, label_ids in tqdm(data_loader, desc="Evaluate"):
+        for input_ids, input_mask, segment_ids, label_ids in data_loader:
             input_ids = input_ids.to(device)
             input_mask = input_mask.to(device)
             segment_ids = segment_ids.to(device)
@@ -119,33 +139,10 @@ class SentimentAnalysis():
             with torch.no_grad():
                 logits = self._model(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask, labels=None)
             logits = logits.detach().cpu().numpy()
-            print(logits)
             predicted_label = np.argmax(logits, axis=1)
-            print(predicted_label)
+            results.append(predicted_label[0])
 
-
-
-
-
-
-
-if __name__=="__main__":
-    seed = 42
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-    model_checkpoint='./../models/fine-tuning/pytorch_imdb_fine_tuned/epoch5.pt'
-    bert_config_file='./../models/uncased_L-12_H-768_A-12/bert_config.json'
-    vocab_file='./../models/uncased_L-12_H-768_A-12/vocab.txt'
-
-    ### initialize an SA system
-    sa_system = SentimentAnalysis(model_checkpoint=model_checkpoint,
-                                bert_config_file=bert_config_file,
-                                vocab_file=vocab_file)
-    
-    sa_system.predict("I am not happy")
-
-
-
+        final_result = 1 if sum(results) > len(results) / 2 else 0
+        
+        return final_result
 
