@@ -50,7 +50,7 @@ class SentimentAnalysis():
         # 1: convert to unicode
         text = tokenization.convert_to_unicode(text)
 
-        # TODO 2: convert to features
+        # 2: convert to features
         # eval_features = convert_examples_to_features(eval_examples, label_list, args.max_seq_length, tokenizer, trunc_medium=args.trunc_medium)
         tokens_a = self.tokenizer.tokenize(text)
 
@@ -103,7 +103,7 @@ class SentimentAnalysis():
             text:         a piece of text
             use_verifier: specify to use verifier'''
         
-        # TODO: covert text: str to features that bert can take in
+        # covert text: str to features that bert can take in
         data_loader = self.convert_text_to_feature(text)
 
         self._model.eval()
