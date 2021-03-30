@@ -7,7 +7,7 @@ import tokenization
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm, trange
 import numpy as np
-
+import random
 
 class InputFeatures(object):
     """A single set of features of data."""
@@ -43,7 +43,7 @@ class SentimentAnalysis():
         ### Initialize tokenizer
         self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file, do_lower_case=True)
 
-    def convert_text_to_feature(self, text, max_seq_length=128):
+    def convert_text_to_feature(self, text, max_seq_length=256):
         '''
         Convert text to features that BERT can take in
         '''
@@ -130,6 +130,11 @@ class SentimentAnalysis():
 
 
 if __name__=="__main__":
+    seed = 42
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
     model_checkpoint='./../models/fine-tuning/pytorch_imdb_fine_tuned/epoch5.pt'
     bert_config_file='./../models/uncased_L-12_H-768_A-12/bert_config.json'
     vocab_file='./../models/uncased_L-12_H-768_A-12/vocab.txt'
@@ -138,8 +143,8 @@ if __name__=="__main__":
     sa_system = SentimentAnalysis(model_checkpoint=model_checkpoint,
                                 bert_config_file=bert_config_file,
                                 vocab_file=vocab_file)
-    for _ in range(10):
-        sa_system.predict("I am happy")
+    
+    sa_system.predict("I am not happy")
 
 
 
