@@ -21,6 +21,14 @@ torch.manual_seed(seed)
 def check_property_1(original_result, female_mut_results, male_mut_results, N):
     return sum(female_mut_results) == sum(male_mut_results) and sum(female_mut_results) == original_result * N
 
+def repair_with_majority_rule(results):
+    '''
+    repair using majority rule
+    Input: a group of prediction results
+    Output: majority results
+    '''
+    return 1 if 1.0 * sum(results) / len(results) > 0.5 else 0
+
 class InputFeatures(object):
     """A single set of features of data."""
 
@@ -203,14 +211,16 @@ class SentimentAnalysis():
                     ### verify property (2) |pos_M - pos_F| < alpha
                     is_satisfy_prop_2 = True if abs(pos_M - pos_F) < alpha else False
 
-                    ### TODO: let put final_result as original results for now
-                    final_result = original_result
+                    
+
+                    ### as long as we proceed to stage 2, we need to repair.
+
 
         
-        return final_result, is_satisfy_prop_1 and is_satisfy_prop_2
+        return final_result, is_satisfy_prop_2
                 
 
-            
+
 
 
         
