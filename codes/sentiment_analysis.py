@@ -10,11 +10,16 @@ from tqdm import tqdm, trange
 import numpy as np
 import random
 from MutantGeneration import MutantGeneration
+import time
 
 seed = 42
 random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
+
+
+def check_property_1(original_result, female_mut_results, male_mut_results, N):
+    return sum(female_mut_results) == sum(male_mut_results) and sum(female_mut_results) == original_result * N
 
 class InputFeatures(object):
     """A single set of features of data."""
@@ -117,6 +122,100 @@ class SentimentAnalysis():
         return data_loader
 
 
+
+
+
+
+    def predict_biasRV(self, text: str):
+        '''
+        Use bias RV to verify at runtime
+        Input: text: str
+        Output: final_result, is_bias
+        '''
+
+        N = 4
+        L = 4
+        is_bias = False
+        alpha = 0.2
+
+        total_time = []
+
+        '''generate mutants use biasfinder'''
+        mg = MutantGeneration(text)
+
+        if len(mg.getMutants()) == 0:
+            ### if there is no mutants generated
+            final_result = self.predict(text)
+
+        is_satisfy_prop_1 = True
+        is_satisfy_prop_2 = True
+
+        if len(mg.getMutants()) > 0:
+            ### if there are mutants generated
+            male_mutants = mg.get_male_mutants()
+            female_mutants = mg.get_female_mutants()
+            assert len(male_mutants) == len(female_mutants)
+
+            # if biasfinder only generates two mutants (one for each gender)
+            if len(male_mutants) == 1:
+                ### TODO: deal with 1 mutant situation
+                ### for now, we just return the result of original texts
+                final_result = self.predict(text)
+
+            ### select N mutants from each gender
+                ### what if mutants are not enough? e.g. only generate 1 but we need 4.
+            if N + L > len(female_mutants):
+                ### TODO: dealing with such situation
+                final_result = self.predict(text)
+            else:
+                # random selection
+                sampled_male_mutants = random.sample(male_mutants, N + L)
+                sampled_female_mutants = random.sample(female_mutants, N + L)
+                original_result = self.predict(text)
+
+                ## processing male_mutants
+                male_mut_results = []
+                for each_text in sampled_male_mutants[0: N - 1]:
+                    male_mut_results.append(self.predict(each_text))
+                
+                ## processing female_mutants
+                female_mut_results = []
+                for each_text in sampled_female_mutants[0: N - 1]:
+                    female_mut_results.append(self.predict(each_text))
+
+                ### verify property (1)
+                is_satisfy_prop_1 = check_property_1(original_result, female_mut_results, male_mut_results, N)
+                if is_satisfy_prop_1:
+                    ### satisfy property (1), no bias
+                    final_result = original_result
+                else:
+                    ### progress to step (2)
+
+                    # compute pos_M for male
+                    for each_text in sampled_male_mutants[N: N + L - 1]:
+                        male_mut_results.append(self.predict(each_text))
+                    pos_M = 1.0 * sum(male_mut_results) / (N + L)
+                    # compute pos_F for female
+                    for each_text in sampled_female_mutants[N: N + L - 1]:
+                        female_mut_results.append(self.predict(each_text))
+                    pos_F = 1.0 * sum(female_mut_results) / (N + L)
+
+                    ### verify property (2) |pos_M - pos_F| < alpha
+                    is_satisfy_prop_2 = True if abs(pos_M - pos_F) < alpha else False
+
+                    ### TODO: let put final_result as original results for now
+                    final_result = original_result
+
+        
+        return final_result, is_satisfy_prop_1 and is_satisfy_prop_2
+                
+
+            
+
+
+        
+
+    
     def predict(self, text: str, use_verifier=False):
         '''
         predict the sentiment label of a list of texts
@@ -124,31 +223,8 @@ class SentimentAnalysis():
             text:         a piece of text
             use_verifier: specify to use verifier'''
 
-        N = 4
-        L = 4
-
         data_loader = self.convert_text_to_feature([text])
-        if use_verifier:
-            '''generate mutants use biasfinder'''
-            mg = MutantGeneration(text)
-            if len(mg.getMutants()) > 0:
-                male_mutants = mg.get_male_mutants()
-                female_mutants = mg.get_female_mutants()
-                assert len(male_mutants) == len(female_mutants)
-                ### select N mutants from each gender
-                    ### what if mutants are not enough? e.g. only generate 1 but we need 4.
-                if N > len(female_mutants):
-                    pass
-                else:
-                    # random selection
-                    sampled_male_mutants = random.sample(male_mutants, N)
-                    sampled_female_mutants = random.sample(female_mutants, N)
-                    data_loader = self.convert_text_to_feature([text] + sampled_male_mutants + sampled_female_mutants)
-
-
-
         # covert text: str to features that bert can take in
-        
 
         self._model.eval()
 
@@ -167,11 +243,9 @@ class SentimentAnalysis():
             predicted_label = np.argmax(logits, axis=1)
             results.append(predicted_label[0])
 
-        final_result = 1 if sum(results) > len(results) / 2 else 0
-        if final_result == 1:
-            confidence = sum(results) / (1.0 * len(results))
-        else:
-            confidence = 1 - sum(results) / (1.0 * len(results))
+        assert len(results) == 1
+
+        final_result = results[0]
         
-        return final_result, confidence, results
+        return final_result
 
