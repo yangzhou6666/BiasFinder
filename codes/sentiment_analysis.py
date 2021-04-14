@@ -50,7 +50,7 @@ class SentimentAnalysis():
         ### Initialize tokenizer
         self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_file, do_lower_case=True)
 
-    def convert_text_to_feature(self, texts, max_seq_length=256):
+    def convert_text_to_feature(self, texts, max_seq_length=128, trunc_medium=-1):
         '''
         Convert text to features that BERT can take in
         '''
@@ -62,6 +62,16 @@ class SentimentAnalysis():
             # 2: convert to features
             # eval_features = convert_examples_to_features(eval_examples, label_list, args.max_seq_length, tokenizer, trunc_medium=args.trunc_medium)
             tokens_a = self.tokenizer.tokenize(text)
+
+            if len(tokens_a) > max_seq_length - 2:
+                if trunc_medium == -2:
+                    tokens_a = tokens_a[0:(max_seq_length - 2)]
+                elif trunc_medium == -1:
+                    tokens_a = tokens_a[-(max_seq_length - 2):]
+                elif trunc_medium == 0:
+                    tokens_a = tokens_a[:(max_seq_length - 2) // 2] + tokens_a[-((max_seq_length - 2) // 2):]
+                elif trunc_medium > 0:
+                    tokens_a = tokens_a[: trunc_medium] + tokens_a[(trunc_medium - max_seq_length + 2):]
 
             tokens = []
             segment_ids = []
@@ -113,17 +123,18 @@ class SentimentAnalysis():
         Parameters
             text:         a piece of text
             use_verifier: specify to use verifier'''
-        
+        data_loader = self.convert_text_to_feature([text])
         if use_verifier:
             '''generate mutants use biasfinder'''
             mg = MutantGeneration(text)
             if len(mg.getMutants()) > 0:
                 mutant = mg.getMutants()
+                data_loader = self.convert_text_to_feature([text] + mutant)
 
 
 
         # covert text: str to features that bert can take in
-        data_loader = self.convert_text_to_feature([text] + mutant)
+        
 
         self._model.eval()
 
@@ -143,6 +154,10 @@ class SentimentAnalysis():
             results.append(predicted_label[0])
 
         final_result = 1 if sum(results) > len(results) / 2 else 0
+        if final_result == 1:
+            confidence = sum(results) / (1.0 * len(results))
+        else:
+            confidence = 1 - sum(results) / (1.0 * len(results))
         
-        return final_result
+        return final_result, confidence, results
 
