@@ -236,7 +236,9 @@ class MutantGeneration:
             templates = [self.template] * 2 * len(male_mutants)
             genders = ["male"] * len(male_mutants)
             genders.extend(["female"] * len(female_mutants))
+            self.male_mutants = male_mutants
             mutants.extend(male_mutants)
+            self.female_mutants = female_mutants
             mutants.extend(female_mutants)
             
             self.examples.append(male_mutants[0])
@@ -244,7 +246,11 @@ class MutantGeneration:
 
         return templates, mutants, genders
 
+    def get_male_mutants(self):
+        return self.male_mutants
     
+    def get_female_mutants(self):
+        return self.female_mutants
     
     def generateMaleMutant(self, template, placeholders, gender) :
         

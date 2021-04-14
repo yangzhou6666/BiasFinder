@@ -123,13 +123,18 @@ class SentimentAnalysis():
         Parameters
             text:         a piece of text
             use_verifier: specify to use verifier'''
+
+        N = 4
+        L = 4
+
         data_loader = self.convert_text_to_feature([text])
         if use_verifier:
             '''generate mutants use biasfinder'''
             mg = MutantGeneration(text)
             if len(mg.getMutants()) > 0:
-                mutant = mg.getMutants()
-                data_loader = self.convert_text_to_feature([text] + mutant)
+                male_mutants = mg.get_male_mutants()
+                female_mutants = mg.get_female_mutants()
+                data_loader = self.convert_text_to_feature([text] + male_mutants + female_mutants)
 
 
 
