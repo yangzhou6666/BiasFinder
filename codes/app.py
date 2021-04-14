@@ -13,15 +13,16 @@ sa_system = SentimentAnalysis(model_checkpoint=model_checkpoint,
                             bert_config_file=bert_config_file,
                             vocab_file=vocab_file)
 
+a = 1
+
 @app.route('/predict', methods=['POST'])
 def predict():
+    result = -1
     if request.method == 'POST':
-        # text = request.data['text']
-        text = 'lol'
+        mytext = request.form['mytext']
+        result, confidence = sa_system.predict(mytext, True)
 
-    result = sa_system.predict(text, True)
-
-    return jsonify({'result': result})
+    return jsonify({'result': result, 'confidence': confidence})
 
 
-app.run()
+app.run(host='0.0.0.0',port=8887)
