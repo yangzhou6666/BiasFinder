@@ -134,7 +134,16 @@ class SentimentAnalysis():
             if len(mg.getMutants()) > 0:
                 male_mutants = mg.get_male_mutants()
                 female_mutants = mg.get_female_mutants()
-                data_loader = self.convert_text_to_feature([text] + male_mutants + female_mutants)
+                assert len(male_mutants) == len(female_mutants)
+                ### select N mutants from each gender
+                    ### what if mutants are not enough? e.g. only generate 1 but we need 4.
+                if N > len(female_mutants):
+                    pass
+                else:
+                    # random selection
+                    sampled_male_mutants = random.sample(male_mutants, N)
+                    sampled_female_mutants = random.sample(female_mutants, N)
+                    data_loader = self.convert_text_to_feature([text] + sampled_male_mutants + sampled_female_mutants)
 
 
 
