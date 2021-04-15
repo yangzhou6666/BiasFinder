@@ -136,7 +136,47 @@ def analyze_total_overhead():
     print("Overhead caused by one step: ", sum(one_step_time) / sum(original_time))
     print("Overhead caused by two step: ", sum(two_step_time) / sum(original_time))
 
+def analyze_one_step_perf():
+    ### initialize an SA system
+    sa_system = SentimentAnalysis(model_checkpoint=model_checkpoint,
+                                bert_config_file=bert_config_file,
+                                vocab_file=vocab_file)
+    df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
+    writer = open("one_step_bias.txt", 'w')
+    
+    count = 0
+    bias_count = 0
+    for index, row in df.iterrows():
+        count += 1
+        if count % 30 == 0:
+            pass
+        
+        label = row["label"]
+        text = row["sentence"]
+        final_result, is_bias, total_result, consumed_time, nb_mutants, mutants = sa_system.one_step_biasRV(text, debugging=True)
+        if not is_bias:
+            bias_count += 1
+            to_write = str(count) + '\t' + ">>>>>>>>>>" + '\n'
+            to_write += "Original Text: " + '\n' + text + '\n'
+            # write predicted results for original text
+            to_write += "Predicted Results: " + str(total_result[0]) + '\n'
+            to_write += "Ground truth: " + str(label) + '\n'
+            print(to_write)
+
+            # write mutants results
+            middle = int((len(total_result)) / 2)
+            if middle == 0: 
+                print("Male mutant results: ", end='')
+                print(total_result[ 1 : middle + 1])
+                print("Fema mutant results: ", end='')
+                print(total_result[middle + 1 : ])            
+
+    
+    print("Bias count: ", bias_count)
+    print("Bias rate: ", 1.0 * bias_count / count)
+        
+
 if __name__=="__main__":
-    analyze_total_overhead()
+    analyze_one_step_perf()
 
 
