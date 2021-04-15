@@ -130,11 +130,39 @@ class SentimentAnalysis():
         return data_loader
 
 
+    def one_step_biasRV(self, text: str, debugging=False):
+        '''
+        verify property (1) use all generated mutants.
+        '''
+
+        '''generate mutants use biasfinder'''
+        mg = MutantGeneration(text)
+        results = []
+
+        start_time = time.time()
+        if len(mg.getMutants()) == 0:
+            ### if there is no mutants generated
+            results.append(self.predict(text))
+
+        if len(mg.getMutants()) > 0:
+            ### if there are mutants generated
+            male_mutants = mg.get_male_mutants()
+            female_mutants = mg.get_female_mutants()
+            assert len(male_mutants) == len(female_mutants)
+            for each_mutant in [text] + male_mutants + female_mutants:
+                results.append(self.predict(each_mutant))
+
+        consumed_time = time.time() - start_time
+        final_result = repair_with_majority_rule(results)
+
+        if debugging:
+            return final_result, consumed_time, len(mg.getMutants())
+        
+        return final_result
+        
 
 
-
-
-    def predict_biasRV(self, text: str):
+    def predict_biasRV(self, text: str, debugging=False):
         '''
         Use bias RV to verify at runtime
         Input: text: str
@@ -142,14 +170,16 @@ class SentimentAnalysis():
         '''
 
         N = 4
-        L = 4
+        L = 16
         is_bias = False
-        alpha = 0.2
+        alpha = 0.1
 
         total_time = []
 
         '''generate mutants use biasfinder'''
         mg = MutantGeneration(text)
+
+        start_time = time.time()
 
         if len(mg.getMutants()) == 0:
             ### if there is no mutants generated
@@ -157,6 +187,12 @@ class SentimentAnalysis():
 
         is_satisfy_prop_1 = True
         is_satisfy_prop_2 = True
+        male_mutants = None
+        female_mutants = None
+        male_mut_results = None
+        female_mut_results = None
+        sampled_male_mutants = None
+        sampled_female_mutants = None
 
         if len(mg.getMutants()) > 0:
             ### if there are mutants generated
@@ -183,12 +219,12 @@ class SentimentAnalysis():
 
                 ## processing male_mutants
                 male_mut_results = []
-                for each_text in sampled_male_mutants[0: N - 1]:
+                for each_text in sampled_male_mutants[0: N]:
                     male_mut_results.append(self.predict(each_text))
                 
                 ## processing female_mutants
                 female_mut_results = []
-                for each_text in sampled_female_mutants[0: N - 1]:
+                for each_text in sampled_female_mutants[0: N]:
                     female_mut_results.append(self.predict(each_text))
 
                 ### verify property (1)
@@ -200,31 +236,28 @@ class SentimentAnalysis():
                     ### progress to step (2)
 
                     # compute pos_M for male
-                    for each_text in sampled_male_mutants[N: N + L - 1]:
+                    for each_text in sampled_male_mutants[N: N + L]:
                         male_mut_results.append(self.predict(each_text))
                     pos_M = 1.0 * sum(male_mut_results) / (N + L)
                     # compute pos_F for female
-                    for each_text in sampled_female_mutants[N: N + L - 1]:
+                    for each_text in sampled_female_mutants[N: N + L]:
                         female_mut_results.append(self.predict(each_text))
                     pos_F = 1.0 * sum(female_mut_results) / (N + L)
 
                     ### verify property (2) |pos_M - pos_F| < alpha
                     is_satisfy_prop_2 = True if abs(pos_M - pos_F) < alpha else False
-
-                    
-
                     ### as long as we proceed to stage 2, we need to repair.
-
-
+                    final_result = repair_with_majority_rule([original_result] + male_mut_results + female_mut_results)
+        consumed_time = time.time() - start_time
         
-        return final_result, is_satisfy_prop_2
+        if not is_satisfy_prop_2:
+            is_bias = True
+
+        if debugging:
+            return final_result, is_bias, sampled_male_mutants, sampled_female_mutants, male_mut_results, female_mut_results, consumed_time
+
+        return final_result, is_bias
                 
-
-
-
-
-        
-
     
     def predict(self, text: str, use_verifier=False):
         '''
