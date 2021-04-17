@@ -8,7 +8,7 @@ from MutantGeneration import MutantGeneration
 from matplotlib import pyplot as plt
 import prettytable as pt
 from textwrap import fill
-
+import argparse
 
 model_checkpoint='./../models/fine-tuning/pytorch_imdb_fine_tuned/epoch5.pt'
 bert_config_file='./../models/uncased_L-12_H-768_A-12/bert_config.json'
@@ -244,13 +244,22 @@ def analyze_two_step_per():
 
 
 if __name__=="__main__":
+    parser = argparse.ArgumentParser(description="Evaluate BiasRV")
+    parser.add_argument('question', help='Select the question you want to evaluate')
+    args = parser.parse_args()
 
-    # analyze_mut_generate_time()
-    # analyze_overhead()
-    # analyze_total_overhead()
-    # analyze_one_step_perf()
+    question = args.question
+    if question == "analyze_mut_generate_time":
+        analyze_mut_generate_time()
+    if question == "analyze_overhead":
+        analyze_overhead()
+    if question == "analyze_total_overhead":
+        analyze_total_overhead()
+    if question == "analyze_one_step_perf":
+        analyze_one_step_perf()
+    if question == "analyze_two_step_per":
+        analyze_two_step_per()
 
-    analyze_two_step_per()
 
 
 
