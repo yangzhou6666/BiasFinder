@@ -5,7 +5,9 @@ import time
 import sys
 from utils import preprocessText
 from MutantGeneration import MutantGeneration
-from matplotlib import pyplot as plt 
+from matplotlib import pyplot as plt
+import prettytable as pt
+from textwrap import fill
 
 
 model_checkpoint='./../models/fine-tuning/pytorch_imdb_fine_tuned/epoch5.pt'
@@ -21,7 +23,7 @@ def analyze_mut_generate_time():
     for index, row in df.iterrows():
         count += 1
         if count % 100 == 0:
-            break
+            pass
         label = row["label"]
         text = row["sentence"]
         text = preprocessText(text)
@@ -63,7 +65,7 @@ def analyze_overhead():
         label = row["label"]
         text = row["sentence"]
 
-        final_result, consumed_time, nb_mut = sa_system.one_step_biasRV(text, True)
+        final_result, is_bias, results, consumed_time, nb_mut, mutants = sa_system.one_step_biasRV(text, True)
         one_step_time.append(consumed_time)
 
         ### time for predict once
@@ -137,12 +139,14 @@ def analyze_total_overhead():
     print("Overhead caused by two step: ", sum(two_step_time) / sum(original_time))
 
 def analyze_one_step_perf():
+    '''
+    It logs all the cases that are labelled as "potentially biased".
+    '''
     ### initialize an SA system
     sa_system = SentimentAnalysis(model_checkpoint=model_checkpoint,
                                 bert_config_file=bert_config_file,
                                 vocab_file=vocab_file)
     df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
-    writer = open("one_step_bias.txt", 'w')
     
     count = 0
     bias_count = 0
@@ -176,7 +180,78 @@ def analyze_one_step_perf():
     print("Bias rate: ", 1.0 * bias_count / count)
         
 
+def analyze_two_step_per():
+    '''
+    Log all the cases labelled as "potentially biased" by 2-step verifcation strategy.
+    '''
+    ### initialize an SA system
+    sa_system = SentimentAnalysis(model_checkpoint=model_checkpoint,
+                                bert_config_file=bert_config_file,
+                                vocab_file=vocab_file)
+    df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
+    count = 0
+    bias_count = 0
+    for index, row in df.iterrows():
+        count += 1
+        if count < 19007:
+            continue
+        if count % 30 == 0:
+            break
+        label = row["label"]
+        text = row["sentence"]
+        final_result, is_bias, is_satisfy_prop_1, original_result, sampled_male_mutants, sampled_female_mutants, male_mut_results, female_mut_results, consumed_time = sa_system.predict_biasRV(text, debugging=True)
+
+        if is_bias:
+            original_table = pt.PrettyTable(["Type", "Label", "Original Content", "True Label"],align='l')
+
+            bias_count += 1
+            print('\n' + str(count) + '\t' + ">>>>>>>>>>" + '\n')
+            original_table.add_row(["Origin", str(original_result), fill(text,width=150), str(label)])
+            print(original_table)
+
+            # write mutants results
+            if male_mut_results == None:
+                total_result = [original_result]
+            else:
+                total_result = [original_result] + male_mut_results + female_mut_results
+            
+            middle = int((len(total_result)) / 2)
+            if not middle == 0: 
+                table = pt.PrettyTable(["Type", "Label", "Content"],align='l')
+
+                print("Male mutant results: ", end='')
+                male_results = total_result[ 1 : middle + 1]
+                male_results.sort(reverse=True)
+                print(male_results)
+                print("Fema mutant results: ", end='')
+                female_results = total_result[middle + 1 : ]
+                female_results.sort(reverse=True)
+                print(female_results)
+                texts = [text] + sampled_male_mutants + sampled_female_mutants
+                assert len(texts) == len(total_result)
+                for index in range(len(total_result)):
+                    if index == 0:
+                        continue
+                    if index <= middle:
+                        table.add_row(['Male', str(total_result[index]), fill(texts[index],width=150)])
+                    else:
+                        table.add_row(['Female', str(total_result[index]), fill(texts[index],width=150)])
+
+                print(table)                
+
+    print("Bias count: ", bias_count)
+    print("Bias rate: ", 1.0 * bias_count / count)
+
+
 if __name__=="__main__":
-    analyze_one_step_perf()
+
+    # analyze_mut_generate_time()
+    # analyze_overhead()
+    # analyze_total_overhead()
+    # analyze_one_step_perf()
+
+    analyze_two_step_per()
+
+
 
 
