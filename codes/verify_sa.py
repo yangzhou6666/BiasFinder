@@ -152,28 +152,43 @@ def analyze_one_step_perf():
     bias_count = 0
     for index, row in df.iterrows():
         count += 1
-        if count % 30 == 0:
-            pass
-        
+                
         label = row["label"]
         text = row["sentence"]
         final_result, is_bias, total_result, consumed_time, nb_mutants, mutants = sa_system.one_step_biasRV(text, debugging=True)
-        if not is_bias:
+        if is_bias:
+            original_table = pt.PrettyTable(["Type", "Label", "Original Content", "True Label"],align='l')
             bias_count += 1
-            to_write = str(count) + '\t' + ">>>>>>>>>>" + '\n'
-            to_write += "Original Text: " + '\n' + text + '\n'
-            # write predicted results for original text
-            to_write += "Predicted Results: " + str(total_result[0]) + '\n'
-            to_write += "Ground truth: " + str(label) + '\n'
-            print(to_write)
+            print('\n' + str(count) + '\t' + ">>>>>>>>>>" + '\n')
+            original_table.add_row(["Origin", str(total_result[0]), fill(text,width=150), str(label)])
+            print(original_table)
 
             # write mutants results
             middle = int((len(total_result)) / 2)
-            if middle == 0: 
+            if not middle == 0: 
+                table = pt.PrettyTable(["Type", "Label", "Content"],align='l')
+
                 print("Male mutant results: ", end='')
-                print(total_result[ 1 : middle + 1])
+                male_results = total_result[ 1 : middle + 1]
+                male_results.sort(reverse=True)
+                print(male_results)
                 print("Fema mutant results: ", end='')
-                print(total_result[middle + 1 : ])            
+                female_results = total_result[middle + 1 : ]
+                female_results.sort(reverse=True)
+                print(female_results)
+
+                texts = [text] + mutants
+                assert len(texts) == len(total_result)
+                for index in range(len(total_result)):
+                    if index == 0:
+                        continue
+                    if index <= middle:
+                        table.add_row(['Male', str(total_result[index]), fill(texts[index],width=150)])
+                    else:
+                        table.add_row(['Female', str(total_result[index]), fill(texts[index],width=150)])
+
+                print(table)    
+
 
     
     print("Bias count: ", bias_count)
@@ -193,10 +208,6 @@ def analyze_two_step_per():
     bias_count = 0
     for index, row in df.iterrows():
         count += 1
-        if count < 19007:
-            continue
-        if count % 30 == 0:
-            break
         label = row["label"]
         text = row["sentence"]
         final_result, is_bias, is_satisfy_prop_1, original_result, sampled_male_mutants, sampled_female_mutants, male_mut_results, female_mut_results, consumed_time = sa_system.predict_biasRV(text, debugging=True)
@@ -227,6 +238,7 @@ def analyze_two_step_per():
                 female_results = total_result[middle + 1 : ]
                 female_results.sort(reverse=True)
                 print(female_results)
+
                 texts = [text] + sampled_male_mutants + sampled_female_mutants
                 assert len(texts) == len(total_result)
                 for index in range(len(total_result)):
