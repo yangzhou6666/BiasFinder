@@ -1,4 +1,4 @@
-from BiasRV import biasRV
+from bias_rv.BiasRV import biasRV
 from sentiment_analysis import SentimentAnalysis
 import pandas as pd
 
@@ -15,7 +15,7 @@ vocab_file='./../models/uncased_L-12_H-768_A-12/vocab.txt'
 sa_system = SentimentAnalysis(model_checkpoint=model_checkpoint,
                             bert_config_file=bert_config_file,
                             vocab_file=vocab_file)
-                            
+
 df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
 
 rv = biasRV(sa_system.predict,X=4,Y=16,alpha=0.1)
