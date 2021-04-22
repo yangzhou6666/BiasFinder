@@ -1,8 +1,29 @@
-from bias_rv import *
-from bias_rv.MutantGeneration import MutantGeneration
+import sys
+sys.path.append('./codes/fine-tuning')
+
+from bias_rv.BiasRV import biasRV
+import pandas as pd
+from codes.sentiment_analysis import SentimentAnalysis
 
 
-text = "The Great Dictator is a beyondexcellent film. Charlie Chaplin succeeds in being both extremely funny and witty and yet at the same time provides a strong statement in his satire against fascism. The antiNazi speech by Chaplin at the end, with its values, is one of filmdom's great moments. Throughout this movie, I sensed there was some higher form of intelligence, beyond genuinely intelligent filmmaking, at work."
+model_checkpoint='./models/fine-tuning/pytorch_imdb_fine_tuned/epoch5.pt'
+bert_config_file='./models/uncased_L-12_H-768_A-12/bert_config.json'
+vocab_file='./models/uncased_L-12_H-768_A-12/vocab.txt'
 
-mg = MutantGeneration(text)
-print(mg.getMutants())
+
+### initialize an SA system
+sa_system = SentimentAnalysis(model_checkpoint=model_checkpoint,
+                            bert_config_file=bert_config_file,
+                            vocab_file=vocab_file)
+
+df = pd.read_csv("./asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
+
+rv = biasRV(sa_system.predict,X=4,Y=16,alpha=0.1)
+
+count = 0
+for index, row in df.iterrows():
+    count += 1
+    label = row["label"]
+    text = row["sentence"]
+    result, is_bias = rv.verify(text)
+    print(is_bias)
