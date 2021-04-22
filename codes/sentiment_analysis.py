@@ -138,6 +138,7 @@ class SentimentAnalysis():
         '''generate mutants use biasfinder'''
         mg = MutantGeneration(text)
         results = []
+        is_bias = False
 
         start_time = time.time()
         if len(mg.getMutants()) == 0:
@@ -155,10 +156,13 @@ class SentimentAnalysis():
         consumed_time = time.time() - start_time
         final_result = repair_with_majority_rule(results)
 
+        # TODO: refactor to one function.
+        is_bias = False if sum(results) == results[0] * len(results) else True
+
         if debugging:
-            return final_result, consumed_time, len(mg.getMutants())
+            return final_result, is_bias, results, consumed_time, len(mg.getMutants()), mg.getMutants()
         
-        return final_result
+        return final_result, is_bias
         
 
 
@@ -183,7 +187,8 @@ class SentimentAnalysis():
 
         if len(mg.getMutants()) == 0:
             ### if there is no mutants generated
-            final_result = self.predict(text)
+            original_result = self.predict(text)
+            final_result = original_result
 
         is_satisfy_prop_1 = True
         is_satisfy_prop_2 = True
@@ -198,19 +203,22 @@ class SentimentAnalysis():
             ### if there are mutants generated
             male_mutants = mg.get_male_mutants()
             female_mutants = mg.get_female_mutants()
+
+
             assert len(male_mutants) == len(female_mutants)
 
             # if biasfinder only generates two mutants (one for each gender)
             if len(male_mutants) == 1:
                 ### TODO: deal with 1 mutant situation
                 ### for now, we just return the result of original texts
-                final_result = self.predict(text)
+                original_result = self.predict(text)
+                final_result = original_result
 
             ### select N mutants from each gender
-                ### what if mutants are not enough? e.g. only generate 1 but we need 4.
             if N + L > len(female_mutants):
                 ### TODO: dealing with such situation
-                final_result = self.predict(text)
+                original_result = self.predict(text)
+                final_result = original_result
             else:
                 # random selection
                 sampled_male_mutants = random.sample(male_mutants, N + L)
@@ -254,17 +262,20 @@ class SentimentAnalysis():
             is_bias = True
 
         if debugging:
-            return final_result, is_bias, sampled_male_mutants, sampled_female_mutants, male_mut_results, female_mut_results, consumed_time
+            if not is_satisfy_prop_1 or sampled_male_mutants == None:
+                return final_result, is_bias, is_satisfy_prop_1, original_result, sampled_male_mutants, sampled_female_mutants, male_mut_results, female_mut_results, consumed_time
+            else:
+                return final_result, is_bias, is_satisfy_prop_1, original_result, sampled_male_mutants[0: N], sampled_female_mutants[0: N], male_mut_results, female_mut_results, consumed_time
 
         return final_result, is_bias
                 
     
-    def predict(self, text: str, use_verifier=False):
+    def predict(self, text: str):
         '''
         predict the sentiment label of a list of texts
         Parameters
             text:         a piece of text
-            use_verifier: specify to use verifier'''
+        '''
 
         data_loader = self.convert_text_to_feature([text])
         # covert text: str to features that bert can take in
