@@ -20,9 +20,9 @@ def predict():
     result = -1
     if request.method == 'POST':
         mytext = request.form['mytext']
-        result, confidence = sa_system.predict(mytext, True)
+        result, is_bias = sa_system.predict(mytext, True)
 
-    return jsonify({'result': result, 'confidence': confidence})
+    return jsonify({'result': result, 'is_bias': is_bias})
 
 
 app.run(host='0.0.0.0',port=8887)
