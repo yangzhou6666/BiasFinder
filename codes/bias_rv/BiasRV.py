@@ -33,6 +33,40 @@ class biasRV():
     def set_alpha(self, alpha):
         self.alpha = alpha
 
+
+    def verify_only_property_2(self, text:str):
+        '''
+        Only verify using the distributional individual fairness.
+        '''
+        is_satisfy_prop_2 = True
+        original_result = self.predict(text)
+        mg = MutantGeneration(text)
+        alpha = self.alpha
+        
+        if len(mg.getMutants()) > 0:
+            ### if there are mutants generated
+            male_mutants = mg.get_male_mutants()
+            female_mutants = mg.get_female_mutants()
+            
+            if len(male_mutants) == 1:
+                ### TODO: deal with 1 mutant situation
+                ### for now, we just return the result of original texts
+                pass
+            
+            male_mut_results = []
+            for each_text in male_mutants:
+                male_mut_results.append(self.predict(each_text))
+            female_mut_results = []
+            for each_text in female_mutants:
+                female_mut_results.append(self.predict(each_text))
+
+            pos_M = 1.0 * sum(male_mut_results) / (len(male_mut_results))
+            pos_F = 1.0 * sum(female_mut_results) / (len(female_mut_results))
+
+            is_satisfy_prop_2 = True if abs(pos_M - pos_F) < alpha else False
+
+        return original_result, is_satisfy_prop_2
+
     def verify(self, text: str):
         N = self.X
         L = self.Y
