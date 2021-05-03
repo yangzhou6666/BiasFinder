@@ -48,10 +48,6 @@ class biasRV():
             male_mutants = mg.get_male_mutants()
             female_mutants = mg.get_female_mutants()
             
-            if len(male_mutants) == 1:
-                ### TODO: deal with 1 mutant situation
-                ### for now, we just return the result of original texts
-                pass
             
             male_mut_results = []
             for each_text in male_mutants:
@@ -88,51 +84,46 @@ class biasRV():
 
             assert len(male_mutants) == len(female_mutants)
 
-            # if biasfinder only generates two mutants (one for each gender)
-            if len(male_mutants) == 1:
-                ### TODO: deal with 1 mutant situation
-                ### for now, we just return the result of original texts
-                pass
+            if N > len(female_mutants):
+                N = len(female_mutants)
+                L = 0
             elif N + L > len(female_mutants):
-                ### TODO: dealing with such situation
-                original_result = self.predict(text)
-                final_result = original_result
+                L = len(female_mutants) - N
+
+            ### select N mutants from each gender
+            # random selection
+            sampled_male_mutants = random.sample(male_mutants, N + L)
+            sampled_female_mutants = random.sample(female_mutants, N + L)
+
+            ## processing male_mutants
+            male_mut_results = []
+            for each_text in sampled_male_mutants[0: N]:
+                male_mut_results.append(self.predict(each_text))
+            
+            ## processing female_mutants
+            female_mut_results = []
+            for each_text in sampled_female_mutants[0: N]:
+                female_mut_results.append(self.predict(each_text))
+
+            ### verify property (1)
+            is_satisfy_prop_1 = check_property_1(original_result, female_mut_results, male_mut_results, N)
+            if is_satisfy_prop_1:
+                ### satisfy property (1), no bias
+                pass
             else:
-                ### select N mutants from each gender
-                # random selection
-                print("Nb of mutants: ", len(male_mutants))
-                sampled_male_mutants = random.sample(male_mutants, N + L)
-                sampled_female_mutants = random.sample(female_mutants, N + L)
+                ### progress to step (2)
 
-                ## processing male_mutants
-                male_mut_results = []
-                for each_text in sampled_male_mutants[0: N]:
+                # compute pos_M for male
+                for each_text in sampled_male_mutants[N: N + L]:
                     male_mut_results.append(self.predict(each_text))
-                
-                ## processing female_mutants
-                female_mut_results = []
-                for each_text in sampled_female_mutants[0: N]:
+                pos_M = 1.0 * sum(male_mut_results) / (N + L)
+                # compute pos_F for female
+                for each_text in sampled_female_mutants[N: N + L]:
                     female_mut_results.append(self.predict(each_text))
+                pos_F = 1.0 * sum(female_mut_results) / (N + L)
 
-                ### verify property (1)
-                is_satisfy_prop_1 = check_property_1(original_result, female_mut_results, male_mut_results, N)
-                if is_satisfy_prop_1:
-                    ### satisfy property (1), no bias
-                    pass
-                else:
-                    ### progress to step (2)
-
-                    # compute pos_M for male
-                    for each_text in sampled_male_mutants[N: N + L]:
-                        male_mut_results.append(self.predict(each_text))
-                    pos_M = 1.0 * sum(male_mut_results) / (N + L)
-                    # compute pos_F for female
-                    for each_text in sampled_female_mutants[N: N + L]:
-                        female_mut_results.append(self.predict(each_text))
-                    pos_F = 1.0 * sum(female_mut_results) / (N + L)
-
-                    ### verify property (2) |pos_M - pos_F| < alpha
-                    is_satisfy_prop_2 = True if abs(pos_M - pos_F) < alpha else False
+                ### verify property (2) |pos_M - pos_F| < alpha
+                is_satisfy_prop_2 = True if abs(pos_M - pos_F) < alpha else False
         
         if not is_satisfy_prop_2:
             is_bias = True
