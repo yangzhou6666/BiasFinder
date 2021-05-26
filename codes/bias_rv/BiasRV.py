@@ -15,10 +15,10 @@ def check_property_1(original_result, female_mut_results, male_mut_results, N):
 
 
 class biasRV():
-    def __init__(self, predict, X, Y, alpha):
+    def __init__(self, predict, X, alpha):
         self.predict = predict
         self.X = X
-        self.Y = Y
+        self.Y = 30 - X
         self.alpha = alpha
 
     def set_predictor(self, predict):
