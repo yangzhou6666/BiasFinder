@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="bias_rv",
-    version="0.0.8",
+    version="0.0.9",
     author="Zhou Yang",
     author_email="zyang@smu.edu.sg",
     description="A package to generate biased mutants for texts",
