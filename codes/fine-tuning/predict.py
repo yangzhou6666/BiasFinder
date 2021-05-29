@@ -365,11 +365,13 @@ class BinaryProcessor(DataProcessor):
         """Creates examples for the training and dev sets."""
         examples = []
         for (i, line) in enumerate(lines):
+            ## type(line): <class 'numpy.ndarray'>
             if data_num is not None:
                 if i>data_num:break
             guid = "%s-%s" % (set_type, i)
             text_a = tokenization.convert_to_unicode(str(line[1]))
             label = tokenization.convert_to_unicode(str(line[0]))
+            ### 这里text_a和label都是str
             """if i%1000==0:
                 print(i)
                 print("guid=",guid)
@@ -834,8 +836,8 @@ def main():
             "Cannot use sequence length {} because the BERT model was only trained up to sequence length {}".format(
             args.max_seq_length, bert_config.max_position_embeddings))
 
-    if os.path.exists(args.output_dir) and os.listdir(args.output_dir):
-        raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
+    # if os.path.exists(args.output_dir) and os.listdir(args.output_dir):
+    #     raise ValueError("Output directory ({}) already exists and is not empty.".format(args.output_dir))
     os.makedirs(args.output_dir, exist_ok=True)
 
     task_name = args.task_name.lower()
@@ -843,12 +845,14 @@ def main():
     if task_name not in processors:
         raise ValueError("Task not found: %s" % (task_name))
 
+    ## 用来处理输入
     processor = processors[task_name]()
     label_list = processor.get_labels()
 
     tokenizer = tokenization.FullTokenizer(
         vocab_file=args.vocab_file, do_lower_case=args.do_lower_case)
-        
+    
+    ### 这里应该就是创建了model
     model = BertForSequenceClassification(bert_config, len(label_list), args.layers, pooling=args.pooling_type)
     if args.init_checkpoint is not None:
         model.bert.load_state_dict(torch.load(args.init_checkpoint, map_location='cpu'))
@@ -865,24 +869,33 @@ def main():
     elif n_gpu > 1:
         model = torch.nn.DataParallel(model)
 
-    
+
+    ### 这里进行了预处理,转化为BERT可以接受的输入
     print("Initiate Eval Data")
     data_dir = args.eval_data_dir
+
+    ## 得到了data_dir下的eval_examples
     eval_examples = processor.get_dev_examples(data_dir, data_num=args.num_test_datas)
+
+    ## 将这些examples转化成BERT可以接受的feature
     eval_features = convert_examples_to_features(
         eval_examples, label_list, args.max_seq_length, tokenizer, trunc_medium=args.trunc_medium)
+
 
     all_input_ids = torch.tensor([f.input_ids for f in eval_features], dtype=torch.long)
     all_input_mask = torch.tensor([f.input_mask for f in eval_features], dtype=torch.long)
     all_segment_ids = torch.tensor([f.segment_ids for f in eval_features], dtype=torch.long)
     all_label_ids = torch.tensor([f.label_id for f in eval_features], dtype=torch.long)
 
+    ## 将他们组合起来，并且放到DataLoader中
     eval_data = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
     eval_dataloader = DataLoader(eval_data, batch_size=args.eval_batch_size, shuffle=False)
 
     print("Eval Data")
     epoch = 0
+    # 是必要的
     model.eval()
+
     eval_loss, eval_accuracy = 0, 0
     nb_eval_steps, nb_eval_examples = 0, 0
     with open(os.path.join(args.output_dir, "results_data.txt"),"w") as f:
@@ -894,12 +907,18 @@ def main():
 
             with torch.no_grad():
                 tmp_eval_loss, logits = model(input_ids, segment_ids, input_mask, label_ids)
+                # def forward(self, input_ids, token_type_ids, attention_mask, labels=None):
+                # 这里是直接就算前向传播了？
 
             logits = logits.detach().cpu().numpy()
+            print(logits)
             label_ids = label_ids.to('cpu').numpy()
+            ### 返回最大的索引值
             outputs = np.argmax(logits, axis=1)
+            print(outputs)
             for output in outputs:
                 f.write(str(output)+"\n")
+
             tmp_eval_accuracy=np.sum(outputs == label_ids)
 
             eval_loss += tmp_eval_loss.mean().item()

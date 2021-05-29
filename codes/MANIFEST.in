@@ -1,0 +1,2 @@
+include *.txt
+recursive-include asset *.txt *.csv
