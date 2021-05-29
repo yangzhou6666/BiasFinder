@@ -162,3 +162,33 @@ class SentimentAnalysis():
         
         return final_result
 
+    def predict_batch(self, text: list):
+        '''
+        predict the sentiment label of a list of texts
+        Parameters
+            text:         a piece of text
+        '''
+
+        data_loader = self.convert_text_to_feature(text)
+        # covert text: str to features that bert can take in
+
+        self._model.eval()
+
+        device = self.device
+        results = []
+
+        for input_ids, input_mask, segment_ids, label_ids in data_loader:
+            input_ids = input_ids.to(device)
+            input_mask = input_mask.to(device)
+            segment_ids = segment_ids.to(device)
+            label_ids = label_ids.to(device)
+            
+            with torch.no_grad():
+                logits = self._model(input_ids=input_ids, token_type_ids=segment_ids, attention_mask=input_mask, labels=None)
+            logits = logits.detach().cpu().numpy()
+            predicted_label = np.argmax(logits, axis=1)
+            results.append(predicted_label[0])
+
+        assert len(results) == 1
+
+        return results
