@@ -189,6 +189,6 @@ class SentimentAnalysis():
             predicted_label = np.argmax(logits, axis=1)
             results.append(predicted_label[0])
 
-        assert len(results) == 1
+        assert len(results) == len(text)
 
         return results
