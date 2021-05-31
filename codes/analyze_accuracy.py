@@ -32,7 +32,7 @@ def check_bias(results, alpha):
 
     return is_bias
 
-def predict_on_mutants(df, path_to_mutant, sa_system, path_to_result):
+def predict_on_mutants(df, mutant_dir, sa_system, path_to_result):
     '''
     Given `df`, the dataframe containing original test data
     The function goes to `path_to_mutant`, which stores pre-generated mutants
@@ -114,5 +114,10 @@ if __name__ == '__main__':
     df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
     # original test set
 
-    alpha = 0.05
+    alpha = 0.05   # specify "tolerance to bias"
     path_to_result = '../result/result_' + str(alpha) + ".txt"
+
+    predict_on_mutants(df, mutant_dir, sa_system, path_to_result)
+    # you don't have to call this each time you run
+
+    analyze_performance(path_to_result)
