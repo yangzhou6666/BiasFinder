@@ -21,7 +21,6 @@ def compute_mut():
     while True:
         if not q.empty():
             index, label, text = q.get()
-            text = preprocessText(text)
             mg = MutantGeneration(text)
 
             if len(mg.getMutants()) > 0:
