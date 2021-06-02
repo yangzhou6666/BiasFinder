@@ -12,10 +12,10 @@ class GenderDecider:
     def __init__(self, text):
         self.original = text
         self.docs = nlp(text)
-        self.person_entities = self.getPersonEntities()
-        self.person_coreferences = self.getPersonCoreferencesAndSingleNames()
-        self.gender_distribution = self.getGenderDistribution()
-        self.gender = self.getGender()
+        self.person_entities = None
+        self.person_coreferences = None
+        self.gender_distribution = None
+        self.gender = None
 
 
 
@@ -29,17 +29,21 @@ class GenderDecider:
             if e.isPerson():
                 entities.add(e.getWord())
         return list(entities)
-
     
     def getPersonCoreferencesAndSingleNames(self):
         '''
         returns a list containing lists of person coreferences and single names which do not have a coreference
+        basically gets all the gender words in the text
         '''
+        if not self.person_entities:
+            self.person_entities = self.getPersonEntities()
+
         result = self.getPersonCoreferences()
         coreferences = [item.getPhrase() for coref in result for item in coref]
         for e in self.person_entities:
             if e not in coreferences:
                 result.append([Phrase(e)])
+        
         return result
 
     def getPersonCoreferences(self) :
@@ -71,12 +75,19 @@ class GenderDecider:
         '''
         returns true/false depending on whether the text is a person's name
         '''
+        if not self.person_entities:
+            self.person_entities = self.getPersonEntities()
+
         return text in self.person_entities 
 
     def getGenderDistribution(self) : 
         '''
         returns a dictionary with the gender as the key and a list of words of that gender as the value
         '''
+
+        if not self.person_coreferences:
+            self.person_coreferences = self.getPersonCoreferencesAndSingleNames()
+
         gender_dict = {'male': [],'female': [],'dontknow': []}
 
         #try to ascertain gender of names using pronouns
@@ -126,16 +137,44 @@ class GenderDecider:
         '''
         returns gender of the text using the majority rule
         '''
-        if len(self.gender_distribution["male"]) > len(self.gender_distribution["female"]):
-            return "male"
-        return "female"
+        if not self.gender_distribution:
+            self.gender_distribution = self.getGenderDistribution()
+        
+        no_of_males = len(self.gender_distribution["male"])
+        no_of_females = len(self.gender_distribution["female"])
+
+        if no_of_males == 0 and no_of_females == 0:
+            self.gender = "no gender"
+        elif no_of_males > no_of_females:
+            self.gender = "male"
+        elif no_of_males < no_of_females:
+            self.gender = "female"
+        elif no_of_males == no_of_females:
+            self.gender = "cannot decide"
+
+        return self.gender
+
+    def getGenderProportion(self):
+        '''
+        returns proportion of male words and proportion of female words in the text
+        '''
+
+        if not self.gender_distribution:
+            self.gender_distribution = self.getGenderDistribution()
+        
+        no_of_males = len(self.gender_distribution["male"])
+        no_of_females = len(self.gender_distribution["female"])
+        total = no_of_males + no_of_females
+
+        if total == 0:
+            return "no gender"
+
+        male_proportion = no_of_males/total
+        female_proportion = no_of_females/total
+
+        return {'Proportion of male words': male_proportion, 'Proportion of female words': female_proportion}
 
 
-
-
-obj = GenderDecider("When Jane embarked into this voyage, she hardly knew who her father really was. By the end of the film, she found her and comes to terms with the strange life she lived as a child. Brock lives in Singapore.")
-print(obj.gender_distribution)
-print(obj.gender)
 
 
 
