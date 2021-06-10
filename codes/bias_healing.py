@@ -105,8 +105,8 @@ def analyze_performance(path_to_result):
         lines = f.readlines()
         total_count = len(lines)
         total_correct_count_original = 0
-        total_correct_count_majority = 0
-        total_correct_count_minority = 0
+        majority_count = 0
+        minority_count = 0
         biased_count = 0
         biased_and_correct_count = 0
         for line in lines:
@@ -118,17 +118,15 @@ def analyze_performance(path_to_result):
 
             if true_label == pred_label:
                 total_correct_count_original += 1
-            
-            if true_label == majority_label:
-                total_correct_count_majority += 1
-            
-            if true_label == minority_label:
-                total_correct_count_minority += 1
-
+        
             if is_bias == 'True':
                 biased_count += 1
                 if true_label == pred_label:
                     biased_and_correct_count += 1
+                if true_label == majority_label:
+                    majority_count +=1
+                if true_label == minority_label:
+                    minority_count +=1
         
         print("--------USING RESULTS OF ORIGINAL TEXT--------")
         print("Correct Predictions: ", total_correct_count_original)
@@ -140,15 +138,15 @@ def analyze_performance(path_to_result):
         print("Accuracy on Biased Predictions: ", 1.0 * biased_and_correct_count / biased_count)
 
         print("--------USING RESULTS OF MAJORITY MUTANTS--------")
-        print("Correct Predictions: ", total_correct_count_majority)
-        print("Total Predictions: ", total_count)
-        print("Accuracy: ", 1.0 * total_correct_count_majority / total_count)
+        print("Correct Predictions: ", majority_count)
+        print("Total Biased Predictions: ", biased_count)
+        print("Accuracy: ", 1.0 * majority_count / biased_count)
 
 
         print("--------USING RESULTS OF MINORITY MUTANTS--------")
-        print("Correct Predictions: ", total_correct_count_minority)
-        print("Total Predictions: ", total_count)
-        print("Accuracy: ", 1.0 * total_correct_count_minority / total_count)
+        print("Correct Predictions: ", minority_count)
+        print("Total Biased Predictions: ", biased_count)
+        print("Accuracy: ", 1.0 * minority_count / biased_count)
 
 
 if __name__ == '__main__':
