@@ -50,13 +50,17 @@ def predict_on_mutants(df, mutant_dir, sa_system, path_to_result):
             text = row["sentence"] # original text
             path_to_mutant = mutant_dir + str(index) + '.csv'
             mutants = [text]
+            templates = []
             if os.path.exists(path_to_mutant):
                 # if there are generated mutants
-                df_mutant = pd.read_csv(path_to_mutant, names=["label", "sentence"], sep="\t")
+                df_mutant = pd.read_csv(path_to_mutant, names=["label", "mutant", "template"], sep="\t")
                 for index_new, row_new in df_mutant.iterrows():
-                    mutants.append(row_new["sentence"])
+                    mutants.append(row_new["mutant"])
+                    templates.append(row_new["template"])
                 results = []
                 results = sa_system.predict_batch(mutants)
+                templates_result = sa_system.predict(templates[0])
+                
 
                 index_1st_female_mutant = int((len(results)+ 1)/2)
                 male_mutants = results[1:index_1st_female_mutant]
@@ -92,8 +96,8 @@ def predict_on_mutants(df, mutant_dir, sa_system, path_to_result):
                 results_minority_mutants = 1 - results_majority_mutants
 
                 is_bias = check_bias(results, alpha=0.05)
-                employee_writer.writerow([str(index), str(label), str(results[0]), str(results_male_mutants), str(results_female_mutants), str(results_majority_mutants), str(results_minority_mutants), str(is_bias)])
-                #each row: index, label, results_of_original_text, results_of_male_mutants, results_of_female_mutants, results_majority_mutants, results_minority_mutants, is_bias
+                employee_writer.writerow([str(index), str(label), str(results[0]), str(results_male_mutants), str(results_female_mutants), str(results_majority_mutants), str(results_minority_mutants), str(templates_result), str(is_bias)])
+                #each row: index, label, results_of_original_text, results_of_male_mutants, results_of_female_mutants, results_majority_mutants, results_minority_mutants, templates_result, is_bias
 
 def analyze_performance(path_to_result):
     '''
@@ -107,14 +111,20 @@ def analyze_performance(path_to_result):
         total_correct_count_original = 0
         majority_count = 0
         minority_count = 0
+        male_majority_count = 0
+        female_majority_count = 0 
+        template_count = 0
         biased_count = 0
         biased_and_correct_count = 0
         for line in lines:
             true_label = line.split(',')[1]
             pred_label = line.split(',')[2]
+            male_majority_label = line.split(',')[3]
+            female_majority_label = line.split(',')[4]
             majority_label = line.split(',')[5]
             minority_label = line.split(',')[6]
-            is_bias = line.split(',')[7].strip()
+            template_label = line.split(',')[7]
+            is_bias = line.split(',')[8].strip()
 
             if true_label == pred_label:
                 total_correct_count_original += 1
@@ -127,6 +137,12 @@ def analyze_performance(path_to_result):
                     majority_count +=1
                 if true_label == minority_label:
                     minority_count +=1
+                if true_label == male_majority_label:
+                    male_majority_count += 1
+                if true_label == female_majority_label:
+                    female_majority_count += 1
+                if true_label == template_label:
+                    template_count += 1
         
         print("--------USING RESULTS OF ORIGINAL TEXT--------")
         print("Correct Predictions: ", total_correct_count_original)
@@ -147,6 +163,21 @@ def analyze_performance(path_to_result):
         print("Correct Predictions: ", minority_count)
         print("Total Biased Predictions: ", biased_count)
         print("Accuracy: ", 1.0 * minority_count / biased_count)
+
+        print("--------USING RESULTS OF MAJORIY OF MALE MUTANTS--------")
+        print("Correct Predictions: ", male_majority_count)
+        print("Total Biased Predictions: ", biased_count)
+        print("Accuracy: ", 1.0 * male_majority_count / biased_count)
+
+        print("--------USING RESULTS OF MAJORITY OF FEMALE MUTANTS--------")
+        print("Correct Predictions: ", female_majority_count)
+        print("Total Biased Predictions: ", biased_count)
+        print("Accuracy: ", 1.0 * female_majority_count / biased_count)
+
+        print("--------USING RESULTS OF TEMPLATE--------")
+        print("Correct Predictions: ", template_count)
+        print("Total Biased Predictions: ", biased_count)
+        print("Accuracy: ", 1.0 * template_count / biased_count)
 
 
 if __name__ == '__main__':

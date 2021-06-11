@@ -96,7 +96,7 @@ while not q_to_store.empty():
     mutants.extend(mutant)
     genders.extend(gender)
     
-    dm = pd.DataFrame(data={"label": labels, "mutant": mutants})
+    dm = pd.DataFrame(data={"label": labels, "mutant": mutants, "template": templates})
     
     dm.to_csv(data_dir + str(index) + '.csv', index=None, header=None, sep="\t")
 
