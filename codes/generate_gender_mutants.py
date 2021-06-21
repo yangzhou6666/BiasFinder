@@ -26,21 +26,20 @@ def compute_mut():
             if len(mg.getMutants()) > 0:
                 original = [text] * len(mg.getMutants())
                 label = [label] * len(mg.getMutants())
-                template = mg.getTemplates()
+                concrete_template = [mg.getConcreteTemplate()] * len(mg.getMutants())
                 mutant = mg.getMutants()
                 gender = mg.getGenders()
                 q_to_store.put((
-                    index, original, label, template, mutant, gender
+                    index, original, label, concrete_template, mutant, gender
                 ))
         else:
             print("Finished")
             return
 
 
-df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
+df = pd.read_csv("../asset/sst/test_final.csv", header = 0, sep=",")
 
 start = time.time()
-
 
 
 n_template = 0
@@ -54,7 +53,11 @@ q_to_store = manager.Queue()
 
 
 for index, row in df.iterrows():
-    label = row["label"]
+    sentiment = row["sentiment"]
+    if sentiment >= 0.6:
+        label = 1
+    elif sentiment <= 0.4:
+        label = 0
     text = row["sentence"]
     q.put((index, label, text))
 
@@ -72,7 +75,7 @@ print("Generation Process finished.")
 
 ### Save in seperated csv files, instead of one.
 
-data_dir = "../data/biasfinder/gender/each/" 
+data_dir = "../data/biasfinder/gender/sst/each/" 
 if not os.path.exists(data_dir) :
     os.makedirs(data_dir)
 
@@ -81,7 +84,7 @@ while not q_to_store.empty():
     ### start to save.
 
     originals = []
-    templates = []
+    concrete_templates = []
     mutants = []
     labels = []
     identifiers = []
@@ -89,14 +92,14 @@ while not q_to_store.empty():
     genders = []
     countries = []
 
-    index, original, label, template, mutant, gender = q_to_store.get()
+    index, original, label, concrete_template, mutant, gender = q_to_store.get()
     originals.extend(original)
     labels.extend(label)
-    templates.extend(template)
+    concrete_templates.extend(concrete_template)
     mutants.extend(mutant)
     genders.extend(gender)
     
-    dm = pd.DataFrame(data={"label": labels, "mutant": mutants, "template": templates})
+    dm = pd.DataFrame(data={"label": labels, "mutant": mutants, "template": concrete_templates})
     
     dm.to_csv(data_dir + str(index) + '.csv', index=None, header=None, sep="\t")
 

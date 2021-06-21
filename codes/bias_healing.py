@@ -40,26 +40,29 @@ def predict_on_mutants(df, mutant_dir, sa_system, path_to_result):
     Then it use `sa_system` to predict sentiments of mutants
     and store results in `path_to_result`
     '''
-
     with open(path_to_result, mode='w') as f:
         employee_writer = csv.writer(f, delimiter=',')
 
         #employee_writer.writerow(['John Smith', 'Accounting', 'November'])
         for index, row in tqdm(df.iterrows(), desc="Evaluate"):
-            label = row["label"]
-            text = row["sentence"] # original text
+            sentiment = row["sentiment"]
+            if sentiment >= 0.6:
+                label = 1
+            else: #test set only has sentiments <=0.4 and >=0.6
+                label = 0
+            text = row["sentence"]
             path_to_mutant = mutant_dir + str(index) + '.csv'
             mutants = [text]
-            templates = []
+            concrete_templates = []
             if os.path.exists(path_to_mutant):
                 # if there are generated mutants
-                df_mutant = pd.read_csv(path_to_mutant, names=["label", "mutant", "template"], sep="\t")
+                df_mutant = pd.read_csv(path_to_mutant, names=["label", "mutant", "concrete_template"], sep="\t")
                 for index_new, row_new in df_mutant.iterrows():
                     mutants.append(row_new["mutant"])
-                    templates.append(row_new["template"])
+                    concrete_templates.append(row_new["concrete_template"])
                 results = []
                 results = sa_system.predict_batch(mutants)
-                templates_result = sa_system.predict(templates[0])
+                concrete_templates_result = sa_system.predict(concrete_templates[0])
                 
 
                 index_1st_female_mutant = int((len(results)+ 1)/2)
@@ -95,9 +98,9 @@ def predict_on_mutants(df, mutant_dir, sa_system, path_to_result):
                 
                 results_minority_mutants = 1 - results_majority_mutants
 
-                is_bias = check_bias(results, alpha=0.05)
-                employee_writer.writerow([str(index), str(label), str(results[0]), str(results_male_mutants), str(results_female_mutants), str(results_majority_mutants), str(results_minority_mutants), str(templates_result), str(is_bias)])
-                #each row: index, label, results_of_original_text, results_of_male_mutants, results_of_female_mutants, results_majority_mutants, results_minority_mutants, templates_result, is_bias
+                is_bias = check_bias(results, alpha=0.001)
+                employee_writer.writerow([str(index), str(label), str(results[0]), str(results_male_mutants), str(results_female_mutants), str(results_majority_mutants), str(results_minority_mutants), str(concrete_templates_result), str(is_bias)])
+                #each row: index, label, results_of_original_text, results_of_male_mutants, results_of_female_mutants, results_majority_mutants, results_minority_mutants, concrete_templates_result, is_bias
 
 def analyze_performance(path_to_result):
     '''
@@ -113,7 +116,7 @@ def analyze_performance(path_to_result):
         minority_count = 0
         male_majority_count = 0
         female_majority_count = 0 
-        template_count = 0
+        concrete_template_count = 0
         biased_count = 0
         biased_and_correct_count = 0
         for line in lines:
@@ -123,7 +126,7 @@ def analyze_performance(path_to_result):
             female_majority_label = line.split(',')[4]
             majority_label = line.split(',')[5]
             minority_label = line.split(',')[6]
-            template_label = line.split(',')[7]
+            concrete_template_label = line.split(',')[7]
             is_bias = line.split(',')[8].strip()
 
             if true_label == pred_label:
@@ -141,8 +144,8 @@ def analyze_performance(path_to_result):
                     male_majority_count += 1
                 if true_label == female_majority_label:
                     female_majority_count += 1
-                if true_label == template_label:
-                    template_count += 1
+                if true_label == concrete_template_label:
+                    concrete_template_count += 1
         
         print("--------USING RESULTS OF ORIGINAL TEXT--------")
         print("Correct Predictions: ", total_correct_count_original)
@@ -174,16 +177,16 @@ def analyze_performance(path_to_result):
         print("Total Biased Predictions: ", biased_count)
         print("Accuracy: ", 1.0 * female_majority_count / biased_count)
 
-        print("--------USING RESULTS OF TEMPLATE--------")
-        print("Correct Predictions: ", template_count)
+        print("--------USING RESULTS OF CONCRETE TEMPLATE--------")
+        print("Correct Predictions: ", concrete_template_count)
         print("Total Biased Predictions: ", biased_count)
-        print("Accuracy: ", 1.0 * template_count / biased_count)
+        print("Accuracy: ", 1.0 * concrete_template_count / biased_count)
 
 
 if __name__ == '__main__':
 
     ## initialize an SA system
-    model_checkpoint='./../models/fine-tuning/pytorch_imdb_fine_tuned/epoch5.pt'
+    model_checkpoint='./../models/fine-tuning/pytorch_sst_fine_tuned_20_epoch_updated_training_set/epoch20.pt'
     bert_config_file='./../models/uncased_L-12_H-768_A-12/bert_config.json'
     vocab_file='./../models/uncased_L-12_H-768_A-12/vocab.txt'
 
@@ -192,14 +195,15 @@ if __name__ == '__main__':
                                 vocab_file=vocab_file)
     
 
-    mutant_dir = "../data/biasfinder/gender/each/" 
+    mutant_dir = "../data/biasfinder/gender/sst/each/" 
     # the folder that stores generated mutants.
 
-    df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
+    #df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
+    df = pd.read_csv("../asset/sst/test_final.csv", header = 0, sep=",")
     # original test set
 
-    alpha = 0.05   # specify "tolerance to bias"
-    path_to_result = '../result/bias_healing_' + str(alpha) + ".csv"
+    alpha = 0.001   # specify "tolerance to bias"
+    path_to_result = '../result/sst_bias_healing_latest' + str(alpha) + ".csv"
 
     predict_on_mutants(df, mutant_dir, sa_system, path_to_result)
     # you don't have to call this each time you run

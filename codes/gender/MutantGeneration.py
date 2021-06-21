@@ -389,3 +389,32 @@ class MutantGeneration:
             else :
                 templates.append(template)
         return templates
+
+
+
+    def getConcreteTemplate(self):
+        template = self.getTemplate()
+        #replace <name> with "the person"
+        template = template.replace(tag(NAME), "the person")
+        #replace <gaw> with "the person"
+        template = template.replace(tag(GAW), "the person")
+        #replace pronouns with the person/ the person's
+        template = template.replace(tag(PRONOUN + "-he"), "the person")
+        template = template.replace(tag(PRONOUN + "-she"), "the person")
+        template = template.replace(tag(PRONOUN + "-He"), "The person")
+        template = template.replace(tag(PRONOUN + "-She"), "The person")
+        template = template.replace(tag(PRONOUN + "-HE"), "The person")
+        template = template.replace(tag(PRONOUN + "-SHE"), "The person")
+        template = template.replace(tag(PRONOUN + "-his"), "the person's")
+        template = template.replace(tag(PRONOUN + "-her"), "the person's")
+        template = template.replace(tag(PRONOUN + "-His"), "The person's")
+        template = template.replace(tag(PRONOUN + "-Her"), "The person's")
+        template = template.replace(tag(PRONOUN + "-him"), "the person")
+        template = template.replace(tag(PRONOUN + "-Him"), "The person")
+        template = template.replace(tag(PRONOUN + "-himself"), "oneself")
+        template = template.replace(tag(PRONOUN + "-herself"), "oneself")
+        template = template.replace(tag(PRONOUN + "-Himself"), "Oneself")
+        template = template.replace(tag(PRONOUN + "-Herself"), "Oneself")
+        return template
+        
+
