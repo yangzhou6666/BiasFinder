@@ -268,6 +268,7 @@ Here the final file structure to better know where to put the models and data:
 |   |   `-- train.csv
 |   `-- predefined_occupation_list
 |       `-- neutral-occupation.csv 
+|   |-- mutants.zip
 |-- codes
 |   |-- country
 |   |   |-- BTC.ipynb
