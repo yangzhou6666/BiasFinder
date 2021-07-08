@@ -142,6 +142,7 @@ class SentimentAnalysis():
         '''
 
         data_loader = self.convert_text_to_feature([text])
+        
         # covert text: str to features that bert can take in
 
         self._model.eval()
@@ -233,12 +234,141 @@ class SentimentAnalysis():
         
         return result
 
+def minority_or_majority(mutants, predict, majority):
+    
+    results = []
+    for m in mutants:
+        results.append(sa_system.predict(m))
+
+    freq_1 = 0
+    freq_0 = 0
+    for result in results:
+        if result == 1:
+            freq_1 += 1
+        else:
+            freq_0 += 1
+    
+    if freq_1 > freq_0:
+        majority_result = 1
+        minority_result = 0
+    else:
+        majority_result = 0
+        minority_result = 1
+    
+    if majority == True:
+        predict = majority_result
+    else: 
+        predict = minority_result
+    
+    return predict
+
+def average_conf_strategy(mutants, predict):
+
+    confidences = []
+    pos_conf = 0.0
+
+    for m in mutants:
+        result = sa_system.get_confidence(m)
+        pos_conf += result[1]
+        confidences.append(result)
+        
+    pos_confidence = pos_conf / (len(confidences))
+    
+    if pos_confidence > 0.5:
+        predict = 1
+    
+    return predict
+
+def median_conf_strategy(mutants, predict):
+  
+    confidences = []
+    pos_conf = 0.0
+    # male
+
+    for m in mutants:
+        result = sa_system.get_confidence(m)
+        confidences.append(result[1])
+    confidences.sort(reverse = True)
+    if not len(confidences) == 1:
+        for conf in confidences[int(len(confidences)/4):int(len(confidences)*3/4)]:
+            pos_conf += conf
+        
+        median_pos_confidence = pos_conf / (len(confidences)/2)
+    else:
+        for conf in confidences:
+            pos_conf += conf
+        
+        median_pos_confidence = pos_conf / (len(confidences))
+    
+    if median_pos_confidence > 0.5:
+        predict = 1
+    
+    return predict
+
+def male_conf_strategy(mutants, predict):
+  
+    confidences = []
+    pos_conf = 0.0
+    # male
+
+    for m in mutants[0:int(len(mutants)/2)]:
+        result = sa_system.get_confidence(m)
+        confidences.append(result[1])
+    confs = sum(confidences)
+    confidences.sort(reverse = True)
+    if not len(confidences) == 1:
+        for conf in confidences[0:int(len(confidences)/2)]:
+            pos_conf += conf
+        
+        male_pos_confidence = pos_conf / (len(confidences)/2)
+    else:
+        for conf in confidences:
+            pos_conf += conf
+        
+        male_pos_confidence = pos_conf / (len(confidences))
+    
+    if male_pos_confidence > 0.5:
+        predict = 1
+    
+    return [predict, confs]
+
+
+def female_conf_strategy(mutants, predict):
+    
+    # female
+    confidences = []
+    pos_conf = 0.0
+    for m in mutants[int(len(mutants)/2):]:
+        result = sa_system.get_confidence(m)
+        # pos_conf += result[1]
+        confidences.append(result[1])
+    confidences.sort()
+    confs = sum(confidences)
+
+    if not len(confidences) == 1:
+        for conf in confidences[0:int(len(confidences)/2)]:
+            pos_conf += conf
+        
+        female_pos_confidence = pos_conf / (len(confidences)/2)
+    else:
+        for conf in confidences:
+            pos_conf += conf
+        
+        female_pos_confidence = pos_conf / (len(confidences))
+    
+    if female_pos_confidence > 0.5:
+        predict = 1
+    
+    return [predict, confs]
+    
 
 if __name__ == '__main__':
     '''and test scripts'''
     import pandas as pd
     ### initialize an SA system
-    model_checkpoint='./../models/fine-tuning/pytorch_imdb_fine_tuned/epoch5.pt'
+    # model_checkpoint='./../models/fine-tuning/pytorch_imdb_fine_tuned/epoch5.pt'
+    model_checkpoint='./../models/epoch20.pt'
+    # model_checkpoint='./../models/epoch20.pt'
     bert_config_file='./../models/uncased_L-12_H-768_A-12/bert_config.json'
     vocab_file='./../models/uncased_L-12_H-768_A-12/vocab.txt'
 
@@ -246,31 +376,41 @@ if __name__ == '__main__':
                                 bert_config_file=bert_config_file,
                                 vocab_file=vocab_file)
 
-
-    df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
+    df = pd.read_csv("../asset/new_sst_test.csv", header = 0, sep=",")
+    # df = pd.read_csv("../asset/new_imdb_test.csv", names=["label", "sentence"], sep="\t")
     # original test set
     texts = []
     for index, row in df.iterrows():
-        label = row["label"]
+        # label = row["label"]
+        # texts.append(row["sentence"])
         text = row["sentence"]
         texts.append(text)
-        # result = sa_system.get_confidence(text)
 
-
-    mutant_dir = "../data/biasfinder/gender/each/" 
+    mutant_dir = "../data/biasfinder/gender/sst/each3/each/" 
+    # mutant_dir = "../data/biasfinder/gender/new/each1/"
     # the folder that stores generated mutants.
 
-    df = pd.read_csv("../asset/imdb/test.csv", names=["label", "sentence"], sep="\t")
     # original test set
 
     alpha = 0.05   # specify "tolerance to bias"
-    path_to_result = '../result/result_0.001.txt'
-
-    correct_cnt = 0
-
-    cnt = 0
-    repair_cnt = 0
+    path_to_result = '../result/395_sst_result_0.001.txt'
     
+    correct_cnt = 0
+    average_conf_repair = 0
+    male_bottom_repair = 0
+    female_top_repair = 0
+    tmplate_repair_cnt = 0
+    majority_repair_cnt = 0
+    minority_repair_cnt = 0
+    cnt = 0
+    median_conf_repair =0
+    count = 0
+    diff = []
+    male_mutants = 0
+    female_mutants = 0
+    bigger_male_confident = 0
+    all_male_confs = 0
+    all_female_confs = 0
     tb = PrettyTable()
     tb.field_names = ["index", "correct", "difference"]
     with open(path_to_result) as f:
@@ -280,7 +420,17 @@ if __name__ == '__main__':
             ground = int(line.split(',')[1])
             predict = int(line.split(',')[2])
             is_bias = line.split(',')[-1]
-
+            
+            # if os.path.exists(path_to_mutant):
+                # if there are generated mutants
+                
+                # df_mutant = pd.read_csv(path_to_mutant, names=["label", "sentence", "mutant"], sep="\t")
+                # for index_new, row_new in df_mutant.iterrows():
+                #     mutants.append(row_new["sentence"])
+                #     template_content = row_new["mutant"]
+                # # print(mutants)
+                # if len(mutants)<=4:
+                #     count += 1
             if not is_bias.strip() == "False":
                 text = texts[int(index)]
                 result = sa_system.get_confidence(text)
@@ -289,82 +439,54 @@ if __name__ == '__main__':
                 # get all the mutants
                 path_to_mutant = mutant_dir + str(index) + '.csv'
 
-
                 mutants = []
                 if os.path.exists(path_to_mutant):
                     # if there are generated mutants
 
-                    df_mutant = pd.read_csv(path_to_mutant, names=["label", "sentence"], sep="\t")
+                    df_mutant = pd.read_csv(path_to_mutant, names=["label", "sentence", "mutant"], sep="\t")
                     for index_new, row_new in df_mutant.iterrows():
                         mutants.append(row_new["sentence"])
+                        template_content = row_new["mutant"]
+                    male_mutants += len(mutants)/2
+                    female_mutants += len(mutants)/2
+                    if ground == predict:
+                        correct_cnt += 1
+                    male_conf = male_conf_strategy(mutants, predict)
+                    female_conf = female_conf_strategy(mutants, predict)
+                    if ground == male_conf[0]:
+                        male_bottom_repair += 1
+                    if male_conf[1]>female_conf[1]:
+                        bigger_male_confident += 1
+                    if ground == female_conf[0]:
+                        female_top_repair += 1
 
-
-                    mutant_len = len(mutants)
-                    # if mutant_len < 60:
-                    #     continue
-
-
-                    confidences = []
-                    pos_conf = 0.0
-                    neg_conf = 0.0
-
-                    # male
-
-                    for m in mutants[0:int(mutant_len/2)]:
-                        result = sa_system.get_confidence(m)
-                        neg_conf += result[0]
-                        pos_conf += result[1]
-                        confidences.append(result)
-                    
-                    male_pos_confidence = pos_conf / len(confidences)
-                    
-                    # female
-                    confidences = []
-                    pos_conf = 0.0
-                    neg_conf = 0.0
-
-                    for m in mutants[int(mutant_len/2):]:
-                        result = sa_system.get_confidence(m)
-                        neg_conf += result[0]
-                        pos_conf += result[1]
-                        confidences.append(result)
-
-                    female_pos_confidence = pos_conf / len(confidences)
-
-                    diff = round(male_pos_confidence - female_pos_confidence, 2)
-
-                    if abs(diff) > 0.12:
-                        alpha = 1
-                        beta = 0.1
-                        final_confi =  male_pos_confidence * alpha + female_pos_confidence * (1 - alpha)
-                        new_result = 1 if final_confi >= 0.5 else 0
-                        print("----------")
-                        print(index)
-                        print(new_result == ground)
-
-                        print(original_pos_confidence)
-                        print(final_confi)
-                        if new_result == ground:
-                            repair_cnt += 1
-
-
-                        
-
-
-                    tb.add_row([index, str(ground == predict), diff])
-
-
-                    
-                    if (male_pos_confidence - original_pos_confidence) > (female_pos_confidence - original_pos_confidence):
-                        if ground == predict:
-                            correct_cnt += 1
+                    if ground == average_conf_strategy(mutants, predict):
+                        average_conf_repair += 1
                     cnt += 1
+                    all_male_confs += male_conf[1]
+                    all_female_confs += female_conf[1]
+                    
+                    if ground == median_conf_strategy(mutants, predict):
+                        median_conf_repair += 1
+                    if ground == minority_or_majority(mutants, predict, True):
+                        majority_repair_cnt += 1
+                    
+                    if ground == minority_or_majority(mutants, predict, False):
+                        minority_repair_cnt += 1
 
-    print(tb)
-    print(correct_cnt)
-    print("repair cnt: ", repair_cnt)
-
+    print(correct_cnt, correct_cnt/cnt)
     print(cnt)
+    print("majority strategy:", majority_repair_cnt, majority_repair_cnt/cnt)
+    print("minority strategy:", minority_repair_cnt, minority_repair_cnt/cnt)
+    print("average conf strategy:", average_conf_repair, average_conf_repair/cnt)
+    print("male bottom strategy:", male_bottom_repair, male_bottom_repair/cnt)
+    print("female top strategy:", female_top_repair, female_top_repair/cnt)
+    print("median top strategy:", median_conf_repair, median_conf_repair/cnt)
+    if all_male_confs > all_female_confs:
+        print("male confs are bigger", all_male_confs-all_female_confs, (all_male_confs-all_female_confs)/male_mutants)
+    else:
+        print("female confs are bigger", abs(all_male_confs-all_female_confs), abs(all_male_confs-all_female_confs)/female_mutants)
+    print(bigger_male_confident)
                     
 
                     
