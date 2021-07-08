@@ -34,7 +34,6 @@ class MutantGeneration:
         self.docs = nlp(text)
         
         self.person_entities = self.getPersonEntities()
-
         # self.coreferences = []
         self.person_coreferences = []
         self.person_coreferences = self.getPersonCoreferences()
@@ -52,7 +51,6 @@ class MutantGeneration:
             coref = Coreference(r.main, r.mentions)
             if self.isPersonCoref(coref) : # only take valid coreference
                 coreferences.append(coref)
-        
         return coreferences
 
     def isValid(self, coref):
@@ -395,22 +393,22 @@ class MutantGeneration:
     def getConcreteTemplate(self):
         template = self.getTemplate()
         #replace <name> with "the person"
-        template = template.replace(tag(NAME), "the person")
+        template = template.replace(tag(NAME), "X")
         #replace <gaw> with "the person"
-        template = template.replace(tag(GAW), "the person")
+        template = template.replace(tag(GAW), "X")
         #replace pronouns with the person/ the person's
-        template = template.replace(tag(PRONOUN + "-he"), "the person")
-        template = template.replace(tag(PRONOUN + "-she"), "the person")
-        template = template.replace(tag(PRONOUN + "-He"), "The person")
-        template = template.replace(tag(PRONOUN + "-She"), "The person")
-        template = template.replace(tag(PRONOUN + "-HE"), "The person")
-        template = template.replace(tag(PRONOUN + "-SHE"), "The person")
-        template = template.replace(tag(PRONOUN + "-his"), "the person's")
-        template = template.replace(tag(PRONOUN + "-her"), "the person's")
-        template = template.replace(tag(PRONOUN + "-His"), "The person's")
-        template = template.replace(tag(PRONOUN + "-Her"), "The person's")
-        template = template.replace(tag(PRONOUN + "-him"), "the person")
-        template = template.replace(tag(PRONOUN + "-Him"), "The person")
+        template = template.replace(tag(PRONOUN + "-he"), "X")
+        template = template.replace(tag(PRONOUN + "-she"), "X")
+        template = template.replace(tag(PRONOUN + "-She"), "X")
+        template = template.replace(tag(PRONOUN + "-He"), "X")
+        template = template.replace(tag(PRONOUN + "-HE"), "X")
+        template = template.replace(tag(PRONOUN + "-SHE"), "X")
+        template = template.replace(tag(PRONOUN + "-his"), "X's")
+        template = template.replace(tag(PRONOUN + "-her"), "X's")
+        template = template.replace(tag(PRONOUN + "-His"), "X's")
+        template = template.replace(tag(PRONOUN + "-Her"), "X's")
+        template = template.replace(tag(PRONOUN + "-him"), "X")
+        template = template.replace(tag(PRONOUN + "-Him"), "X")
         template = template.replace(tag(PRONOUN + "-himself"), "oneself")
         template = template.replace(tag(PRONOUN + "-herself"), "oneself")
         template = template.replace(tag(PRONOUN + "-Himself"), "Oneself")
