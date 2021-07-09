@@ -147,6 +147,12 @@ class BERTEmbeddings(nn.Module):
             token_type_ids = torch.zeros_like(input_ids)
 
         words_embeddings = self.word_embeddings(input_ids)
+        ####
+        distance = torch.norm(self.word_embeddings.weight.data - words_embeddings[0][2], dim=1)
+        nearest = torch.argmin(distance)
+        print(nearest)
+        ###
+
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
@@ -331,6 +337,8 @@ class BertModel(nn.Module):
         self.pooler = BERTPooler(config)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
+        print(input_ids)
+        print("------------")
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids)
         if token_type_ids is None:
@@ -410,6 +418,7 @@ class BertForSequenceClassification(nn.Module):
 
     def forward(self, input_ids, token_type_ids, attention_mask, labels=None):
         encoded_layers, pooled_output = self.bert(input_ids, token_type_ids, attention_mask)
+
         if len(self.layers) > 0:
             hidden_state = []
             for l in self.layers:
