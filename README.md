@@ -106,10 +106,6 @@ other natural number k means head-k + tail-rest (e.g.: head-k + tail-(512-k)).
 
 ## Mutant Generation
 
-Our framework, **BiasFinder**, can be instantiated to identify different kinds of bias. In this work, we show how BiasFinder can be instantiated to uncover bias in three different demographic characteristics: gender, occupation, and country-oforigin.
-
-BiasFinder automatically identifies and curates suitable texts in a large corpus of reviews, and transforms these texts into templates. Each template can be used to produce a large number of mutant texts, by filling in placeholders with concrete values associated with a class (e.g., male vs. female) given a demographic characteristic (e.g., gender)(See Section III and IV). Using these mutant texts, **BiasFinder** then runs the SA system under test, checking if it predicts the same sentiment for two mutants associated with a different class (e.g. male vs. female) of the given characteristic (e.g. gender). A pair of such mutants are related through a metamorphic relation where they share the same predicted sentiment from a fair SA system (See Section V and VI).
-
 ### 1) Gender Bias
 Run this command inside the `codes/gender/` folder
 
